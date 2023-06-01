@@ -3,7 +3,7 @@ Supposing in `myapp.schema` you have a pydantic `BaseModel` to represent your mo
 
 ```python
 from fastapi import Depends
-from tortoise_pagination improt Pagination, Page
+from tortoise_pagination import Pagination, Page
 
 from myapp.main import app
 from myapp.models import MyModel
