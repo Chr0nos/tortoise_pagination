@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "tortoise-pagination"
-version = "1.0.1"
+version = "1.1.0"
 description = "Pagination for Tortoise-ORM on FastAPI"
 authors = ["Sebastien Nicolet <snicolet95@gmail.com>"]
 license = "MIT"
@@ -9,8 +9,8 @@ packages = [{include = "tortoise_pagination"}]
 
 [tool.poetry.dependencies]
 python = "^3.11"
-fastapi = "^0.95.2"
-tortoise = "^0.1.1"
+fastapi = "^0.103.0"
+tortoise-orm = "^0.20.0"
 
 
 [tool.poetry.group.dev.dependencies]
