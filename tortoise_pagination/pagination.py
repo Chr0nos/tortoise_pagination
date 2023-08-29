@@ -3,7 +3,6 @@ from typing import Generic, Type, TypeVar
 
 from fastapi import Query
 from pydantic import BaseModel, NonNegativeInt, PositiveInt
-from pydantic.generics import GenericModel
 from tortoise.contrib.pydantic import PydanticModel
 from tortoise.queryset import QuerySet
 
@@ -12,7 +11,7 @@ M = TypeVar("M")
 
 
 # https://github.com/pydantic/pydantic/pull/595
-class Page(GenericModel, Generic[T], ABC):
+class Page(BaseModel, Generic[T], ABC):
     """Represent a Page of T
     """
     count: NonNegativeInt = 0
