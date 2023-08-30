@@ -1,8 +1,8 @@
 from abc import ABC
 from typing import Generic, Type, TypeVar
 
-from fastapi import Query
-from pydantic import BaseModel, NonNegativeInt, PositiveInt
+from fastapi import HTTPException, Query, status
+from pydantic import BaseModel, NonNegativeInt, PositiveInt, ValidationError
 from tortoise.contrib.pydantic import PydanticModel
 from tortoise.queryset import QuerySet
 
@@ -33,7 +33,13 @@ class Pagination(BaseModel):
         offset: NonNegativeInt | None = Query(None),
         limit: NonNegativeInt | None = Query(10)
     ) -> "Pagination":
-        return cls(offset=offset, limit=limit)
+        try:
+            return cls(offset=offset, limit=limit)
+        except ValidationError as error:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=error.errors()
+            )
 
     def paginate_queryset(self, queryset: QuerySet[M]) -> QuerySet[M]:
         if self.limit is not None:
