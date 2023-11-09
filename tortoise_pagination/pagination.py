@@ -2,7 +2,7 @@ from abc import ABC
 from typing import Generic, Type, TypeVar
 
 from fastapi import HTTPException, Query, status
-from pydantic import BaseModel, NonNegativeInt, PositiveInt, ValidationError
+from pydantic import BaseModel, NonNegativeInt, ValidationError
 from tortoise.contrib.pydantic import PydanticModel
 from tortoise.queryset import QuerySet
 
@@ -25,7 +25,7 @@ class Pagination(BaseModel):
     """Represents a Pagination request
     """
     offset: NonNegativeInt | None = None
-    limit: PositiveInt = 10
+    limit: NonNegativeInt = 10
 
     @classmethod
     def from_query(
@@ -57,8 +57,9 @@ class Pagination(BaseModel):
         """
         paginated_queryset = self.paginate_queryset(queryset)
         pagination_class = Page[schema]
+        limit = paginated_queryset._limit
         page = pagination_class(
-            items=await schema.from_queryset(paginated_queryset),
+            items=await schema.from_queryset(paginated_queryset) if limit else [],
             count=await queryset.count()
         )
         return page
