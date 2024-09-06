@@ -66,9 +66,16 @@ class Pagination(BaseModel):
         if limit > 0:
             tasks.append(schema.from_queryset(paginated_queryset))
 
-        count, *items = await asyncio.gather(*tasks)
-        items = reduce(operator.add, items, [])
-        page = pagination_class(items=items, count=count)
+        try:
+            count = await queryset.count()
+        except IndexError:
+            count = 0
+        if not count:
+            items = []
+        else:
+            items = await schema.from_queryset(queryset)
+
+        page = pagination_class(items=items, count=max(count, 0))
         return page
 
     async def get_custom_paginated_response(
@@ -94,13 +101,14 @@ class Pagination(BaseModel):
             return await schema.from_tortoise_orm(instance)
 
         queryset = self.paginate_queryset(queryset)
-        items_tasks = [
-            _get_serialized_instance(instance) async for instance in queryset
-        ]
+        if queryset._limit > 0:
+            items_tasks = [
+                _get_serialized_instance(instance) async for instance in queryset
+            ]
+        else:
+            items_tasks = []
         count, *items = await asyncio.gather(queryset.count(), *items_tasks)
-        items = reduce(operator.add, items, [])
-
         pagination_class = Page[schema]
-        pagination_instance = pagination_class(count=count, items=items)
+        pagination_instance = pagination_class(count=max(count, 0), items=items)
 
         return pagination_instance
