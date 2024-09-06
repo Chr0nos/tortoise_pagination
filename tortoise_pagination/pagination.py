@@ -1,6 +1,7 @@
+import asyncio
 from abc import ABC
-from asyncio import TaskGroup
-from typing import Generic, Type, TypeVar
+from inspect import iscoroutinefunction
+from typing import Any, Awaitable, Callable, Generic, Type, TypeVar
 
 from fastapi import HTTPException, Query, status
 from pydantic import BaseModel, Field, NonNegativeInt, ValidationError
@@ -9,6 +10,7 @@ from tortoise.queryset import QuerySet
 
 T = TypeVar("T")
 M = TypeVar("M")
+SCHEMA = TypeVar("SCHEMA", bound=BaseModel)
 
 
 # https://github.com/pydantic/pydantic/pull/595
@@ -20,10 +22,6 @@ class Page(BaseModel, Generic[T], ABC):
 
     class Config:
         arbitrary_types_allowed = True
-
-
-async def _count_queryset(queryset: QuerySet) -> int:
-    return await queryset.count()
 
 
 class Pagination(BaseModel):
@@ -53,20 +51,50 @@ class Pagination(BaseModel):
         return queryset
 
     async def paginated_response(
-        self, queryset: QuerySet, schema: Type[PydanticModel]
+        self,
+        queryset: QuerySet[M],
+        schema: Type[PydanticModel],
     ) -> Page:
         """Returns a page from the given queryset"""
         paginated_queryset = self.paginate_queryset(queryset)
         pagination_class = Page[schema]
         limit = paginated_queryset._limit
 
-        async with TaskGroup() as tg:
-            if limit > 0:
-                items = tg.create_task(schema.from_queryset(paginated_queryset))
-            count = tg.create_task(_count_queryset(queryset))
-
+        count, *items = await asyncio.gather(
+            queryset.count(), schema.from_queryset(paginated_queryset)
+        )
         page = pagination_class(
-            items=(items.result() or []) if limit > 0 else [],
-            count=count.result(),
+            items=(items or []) if limit > 0 else [],
+            count=count,
         )
         return page
+
+    async def get_custom_paginated_response(
+        self,
+        queryset: QuerySet[M],
+        schema: Type[PydanticModel],
+        extra_fields: dict[str, Callable[[M], Any] | Callable[[M], Awaitable[Any]]]
+        | None = None,
+    ) -> Page[SCHEMA]:
+        if extra_fields is None:
+            extra_fields = {}
+
+        async def _get_serialized_instance(instance: M) -> SCHEMA:
+            for field_name, resolver in extra_fields.items():
+                if iscoroutinefunction(resolver):
+                    field_value = await resolver(instance)
+                else:
+                    field_value = resolver(instance)
+                setattr(instance, field_name, field_value)
+
+            return await schema.from_tortoise_orm(instance)
+
+        items_tasks = [
+            _get_serialized_instance(instance) async for instance in queryset
+        ]
+        count, *items = await asyncio.gather(queryset.count(), *items_tasks)
+
+        pagination_class = Page[schema]
+        pagination_instance = pagination_class(count=count, items=items)
+
+        return pagination_instance
