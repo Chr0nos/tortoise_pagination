@@ -73,7 +73,9 @@ class Pagination(BaseModel):
         self,
         queryset: QuerySet[M],
         schema: Type[PydanticModel],
-        extra_fields: dict[str, Callable[[M], Any] | Callable[[M], Awaitable[Any]]]
+        extra_fields: dict[
+            str, Callable[[M], Any] | Callable[[M], Awaitable[Any] | Any]
+        ]
         | None = None,
     ) -> Page[SCHEMA]:
         if extra_fields is None:
