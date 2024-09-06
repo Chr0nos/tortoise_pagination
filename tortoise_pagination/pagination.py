@@ -1,5 +1,7 @@
 import asyncio
+import operator
 from abc import ABC
+from functools import reduce
 from inspect import iscoroutinefunction
 from typing import Any, Awaitable, Callable, Generic, Type, TypeVar
 
@@ -64,7 +66,9 @@ class Pagination(BaseModel):
         if limit > 0:
             tasks.append(schema.from_queryset(paginated_queryset))
 
-        count, items = await asyncio.gather(*tasks)
+        count, *items = await asyncio.gather(*tasks)
+        print(items)
+        items = reduce(operator.add, items, [])
         page = pagination_class(items=items, count=count)
         return page
 
@@ -93,7 +97,7 @@ class Pagination(BaseModel):
         items_tasks = [
             _get_serialized_instance(instance) async for instance in queryset
         ]
-        count, items = await asyncio.gather(queryset.count(), *items_tasks)
+        count, *items = await asyncio.gather(queryset.count(), *items_tasks)
 
         pagination_class = Page[schema]
         pagination_instance = pagination_class(count=count, items=items)
