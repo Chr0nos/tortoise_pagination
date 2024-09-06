@@ -64,11 +64,8 @@ class Pagination(BaseModel):
         if limit > 0:
             tasks.append(schema.from_queryset(paginated_queryset))
 
-        count, *items = await asyncio.gather(*tasks)
-        page = pagination_class(
-            items=(items or []) if limit > 0 else [],
-            count=count,
-        )
+        count, items = await asyncio.gather(*tasks)
+        page = pagination_class(items=items, count=count)
         return page
 
     async def get_custom_paginated_response(
@@ -96,7 +93,7 @@ class Pagination(BaseModel):
         items_tasks = [
             _get_serialized_instance(instance) async for instance in queryset
         ]
-        count, *items = await asyncio.gather(queryset.count(), *items_tasks)
+        count, items = await asyncio.gather(queryset.count(), *items_tasks)
 
         pagination_class = Page[schema]
         pagination_instance = pagination_class(count=count, items=items)
