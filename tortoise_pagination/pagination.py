@@ -67,7 +67,6 @@ class Pagination(BaseModel):
             tasks.append(schema.from_queryset(paginated_queryset))
 
         count, *items = await asyncio.gather(*tasks)
-        print(items)
         items = reduce(operator.add, items, [])
         page = pagination_class(items=items, count=count)
         return page
@@ -94,10 +93,12 @@ class Pagination(BaseModel):
 
             return await schema.from_tortoise_orm(instance)
 
+        queryset = self.paginate_queryset(queryset)
         items_tasks = [
             _get_serialized_instance(instance) async for instance in queryset
         ]
         count, *items = await asyncio.gather(queryset.count(), *items_tasks)
+        items = reduce(operator.add, items, [])
 
         pagination_class = Page[schema]
         pagination_instance = pagination_class(count=count, items=items)
