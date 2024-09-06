@@ -60,9 +60,11 @@ class Pagination(BaseModel):
         pagination_class = Page[schema]
         limit = paginated_queryset._limit
 
-        count, *items = await asyncio.gather(
-            queryset.count(), schema.from_queryset(paginated_queryset)
-        )
+        tasks = [queryset.count()]
+        if limit > 0:
+            tasks.append(schema.from_queryset(paginated_queryset))
+
+        count, *items = await asyncio.gather(*tasks)
         page = pagination_class(
             items=(items or []) if limit > 0 else [],
             count=count,
