@@ -105,7 +105,7 @@ class Pagination(BaseModel):
         # orm raise an error instead of an empty list...
         # that's why we can't do the count in // of fetching the items.
         if paginated_queryset._limit > 0 and count:
-            items = asyncio.gather(
+            items = await asyncio.gather(
                 *[
                     _get_serialized_instance(instance)
                     async for instance in paginated_queryset
