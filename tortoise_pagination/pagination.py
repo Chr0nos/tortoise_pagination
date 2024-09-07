@@ -24,6 +24,15 @@ class Page(BaseModel, Generic[T], ABC):
         arbitrary_types_allowed = True
 
 
+async def count_queryset_safe(queryset: QuerySet) -> int:
+    try:
+        return max(await queryset.count(), 0)
+    # for some reasons the ORM raises an error if nothing matches the offset
+    # IndexError: list index out of range
+    except IndexError:
+        return 0
+
+
 class Pagination(BaseModel):
     """Represents a Pagination request"""
 
@@ -64,14 +73,11 @@ class Pagination(BaseModel):
         if limit > 0:
             tasks.append(schema.from_queryset(paginated_queryset))
 
-        try:
-            count = await queryset.count()
-        except IndexError:
-            count = 0
+        count = await count_queryset_safe(queryset)
         if not count:
             items = []
         else:
-            items = await schema.from_queryset(queryset)
+            items = await schema.from_queryset(paginated_queryset)
 
         page = pagination_class(items=items, count=max(count, 0))
         return page
@@ -98,7 +104,7 @@ class Pagination(BaseModel):
 
             return await schema.from_tortoise_orm(instance)
 
-        count = max(await queryset.count(), 0)
+        count = await count_queryset_safe(queryset)
         paginated_queryset = self.paginate_queryset(queryset)
 
         # don't call the paginated_queryset if there is no count otherwise the
