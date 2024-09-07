@@ -98,15 +98,23 @@ class Pagination(BaseModel):
 
             return await schema.from_tortoise_orm(instance)
 
-        queryset = self.paginate_queryset(queryset)
-        if queryset._limit > 0:
-            items_tasks = [
-                _get_serialized_instance(instance) async for instance in queryset
-            ]
+        count = max(await queryset.count(), 0)
+        paginated_queryset = self.paginate_queryset(queryset)
+
+        # don't call the paginated_queryset if there is no count otherwise the
+        # orm raise an error instead of an empty list...
+        # that's why we can't do the count in // of fetching the items.
+        if paginated_queryset._limit > 0 and count:
+            items = asyncio.gather(
+                *[
+                    _get_serialized_instance(instance)
+                    async for instance in paginated_queryset
+                ]
+            )
         else:
-            items_tasks = []
-        count, *items = await asyncio.gather(queryset.count(), *items_tasks)
+            items = []
+
         pagination_class = Page[schema]
-        pagination_instance = pagination_class(count=max(count, 0), items=items)
+        pagination_instance = pagination_class(count=count, items=items)
 
         return pagination_instance
