@@ -1,7 +1,7 @@
 import asyncio
 from abc import ABC
 from inspect import iscoroutinefunction
-from typing import Any, Awaitable, Callable, Generic, Type, TypeVar
+from typing import Any, Awaitable, Callable, Generic, Sequence, Type, TypeVar
 
 from fastapi import HTTPException, Query, status
 from pydantic import BaseModel, Field, NonNegativeInt, ValidationError, create_model
@@ -22,15 +22,6 @@ class Page(BaseModel, Generic[T], ABC):
 
     class Config:
         arbitrary_types_allowed = True
-
-
-async def count_queryset_safe(queryset: QuerySet) -> int:
-    try:
-        return max(await queryset.count(), 0)
-    # for some reasons the ORM raises an error if nothing matches the offset
-    # IndexError: list index out of range
-    except IndexError:
-        return 0
 
 
 class Pagination(BaseModel):
@@ -59,6 +50,25 @@ class Pagination(BaseModel):
             queryset = queryset.offset(self.offset)
         return queryset
 
+    async def _page_response(
+        self,
+        pagination_class,
+        tasks: Sequence[Awaitable],
+    ) -> Page:
+        """Returns a `Page[pagination_class]`
+        first element of `tasks` must be the count method of the queryset
+        """
+        count, *items = await asyncio.gather(*tasks)
+
+        if items and isinstance(items[0], list):
+            items = items[0]
+
+        page = pagination_class(
+            items=items,
+            count=max(count, 0),
+        )
+        return page
+
     async def paginated_response(
         self,
         queryset: QuerySet[M],
@@ -67,20 +77,13 @@ class Pagination(BaseModel):
         """Returns a page from the given queryset"""
         paginated_queryset = self.paginate_queryset(queryset)
         pagination_class = Page[schema]
-        limit = paginated_queryset._limit
 
         tasks = [queryset.count()]
-        if limit > 0:
+        # don't call the queryset if the limit is 0
+        if paginated_queryset._limit > 0:
             tasks.append(schema.from_queryset(paginated_queryset))
 
-        count = await count_queryset_safe(queryset)
-        if not count:
-            items = []
-        else:
-            items = await schema.from_queryset(paginated_queryset)
-
-        page = pagination_class(items=items, count=max(count, 0))
-        return page
+        return await self._page_response(pagination_class, tasks)
 
     async def get_custom_paginated_response(
         self,
@@ -110,26 +113,20 @@ class Pagination(BaseModel):
 
             return await schema.from_tortoise_orm(instance)
 
-        count = await count_queryset_safe(queryset)
         paginated_queryset = self.paginate_queryset(queryset)
 
-        # don't call the paginated_queryset if there is no count otherwise the
-        # orm raise an error instead of an empty list...
-        # that's why we can't do the count in // of fetching the items.
-        if paginated_queryset._limit > 0 and count:
-            items = await asyncio.gather(
-                *[
+        tasks = [queryset.count()]
+        # don't call the queryset if the limit is 0
+        if paginated_queryset._limit > 0:
+            tasks.extend(
+                [
                     _get_serialized_instance(instance)
                     async for instance in paginated_queryset
                 ]
             )
-        else:
-            items = []
 
         pagination_class = Page[schema]
-        pagination_instance = pagination_class(count=count, items=items)
-
-        return pagination_instance
+        return await self._page_response(pagination_class, tasks)
 
 
 def build_pydantic_model_with_extra_fields(
@@ -140,7 +137,7 @@ def build_pydantic_model_with_extra_fields(
 ) -> BaseModel:
     """Builds a new model with extra fields annotated in it from the given model"""
     fields = {
-        field_name: (field_callable.__annotations__["return"], ...)
+        field_name: (field_callable.__annotations__.get("return", Any), ...)
         for field_name, field_callable in extra_fields.items()
     }
     model = create_model(name, **fields, __base__=from_model, **kwargs)
