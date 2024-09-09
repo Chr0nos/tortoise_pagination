@@ -71,3 +71,36 @@ async def list_products(
     )
 
 ```
+
+## Lazy schema
+It's possible to build a custom schema from the extra fields definition
+```python
+from tortoise_pagination import build_pydantic_model_with_extra_fields
+
+
+def _get_name(product: Product) -> str:
+    return product.name.title()
+
+
+async def _compute_price_per_kilogram(product: Product) -> float | None:
+    try:
+        return product.price / product.weight
+    except ZeroDivisionError:
+        return None
+
+
+EXTRA_FIELDS = {
+    "name": _get_name,
+    "price_per_kilogram": _compute_price_per_kilogram
+}
+
+# This model will have `name` and `price_per_kilogram` with the other fields
+# note that you must have return annotation types in given function for extra
+# fields, otherwise Any will be used (ex for lambda functions).
+ProductWithExtraFieldsSchema = build_pydantic_model_with_extra_fields(
+    ProductSchema,
+    "ProductWithExtraFields",
+    EXTRA_FIELDS,
+)
+
+```

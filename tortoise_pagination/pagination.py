@@ -4,7 +4,7 @@ from inspect import iscoroutinefunction
 from typing import Any, Awaitable, Callable, Generic, Type, TypeVar
 
 from fastapi import HTTPException, Query, status
-from pydantic import BaseModel, Field, NonNegativeInt, ValidationError
+from pydantic import BaseModel, Field, NonNegativeInt, ValidationError, create_model
 from tortoise.contrib.pydantic import PydanticModel
 from tortoise.queryset import QuerySet
 
@@ -91,6 +91,12 @@ class Pagination(BaseModel):
         ]
         | None = None,
     ) -> Page[SCHEMA]:
+        """Generate a paginated response using the `extra_fields`,
+        keys are the fields name, values are the value returned by the callable
+        you can pass `user_data` to use extra data in the awaitable function
+        that data will be available in the second argument
+        """
+
         if extra_fields is None:
             extra_fields = {}
 
@@ -124,3 +130,18 @@ class Pagination(BaseModel):
         pagination_instance = pagination_class(count=count, items=items)
 
         return pagination_instance
+
+
+def build_pydantic_model_with_extra_fields(
+    from_model: M,
+    name: str,
+    extra_fields: dict[str, Callable[[M], Any] | Callable[[M], Awaitable[Any] | Any]],
+    **kwargs,
+) -> BaseModel:
+    """Builds a new model with extra fields annotated in it from the given model"""
+    fields = {
+        field_name: (field_callable.__annotations__["return"], ...)
+        for field_name, field_callable in extra_fields.items()
+    }
+    model = create_model(name, **fields, __base__=from_model, **kwargs)
+    return model
