@@ -48,6 +48,7 @@ async def test_pagination_extra_fields() -> None:
         "ProductSchemaWithExtras",
         extra_fields,
     )
+    assert issubclass(new_schema, ProductSchema)
 
     await Product.all().delete()
     product = await Product.create(name="my awesome product", price=12.3, weight=1.2)
