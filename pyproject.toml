@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "tortoise-pagination"
-version = "1.2.12"
+version = "1.2.13"
 description = "Pagination for Tortoise-ORM on FastAPI"
 authors = ["Sebastien Nicolet <snicolet95@gmail.com>"]
 license = "MIT"
@@ -11,7 +11,8 @@ packages = [{include = "tortoise_pagination"}]
 python = "^3.11"
 fastapi = ">=0.104.1"
 pydantic = ">2.0.0"
-tortoise-orm = "^0.22.0"
+tortoise-orm = "^0.23.0"
+asyncpg = "^0.30.0"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -21,7 +22,6 @@ black = "^23.11.0"
 pytest = "^8.3.2"
 testcontainers = "^4.8.1"
 mock = "^5.1.0"
-asyncpg = "^0.29.0"
 pytest-asyncio = "^0.24.0"
 anyio = "^4.4.0"
 
