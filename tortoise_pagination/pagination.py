@@ -4,8 +4,7 @@ from inspect import iscoroutinefunction
 from typing import Any, Awaitable, Callable, Generic, Sequence, Type, TypeVar
 
 from fastapi import HTTPException, Query, status
-from pydantic import (BaseModel, Field, NonNegativeInt, ValidationError,
-                      create_model)
+from pydantic import BaseModel, Field, NonNegativeInt, ValidationError
 from tortoise.contrib.pydantic import PydanticModel
 from tortoise.queryset import QuerySet
 
